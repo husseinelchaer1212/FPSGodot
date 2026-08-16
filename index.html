@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<title>Godot PlayGround Engine</title>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+
+	<link rel="icon" type="image/png" href="/icons/icon-192.png">
+	<link rel="apple-touch-icon" href="/icons/icon-512.png">
+	<link rel="manifest" href="/manifest.json">
+	<meta name="theme-color" content="#4874ff">
+	<meta name="apple-mobile-web-app-capable" content="yes">
+	<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+	<meta name="apple-mobile-web-app-title" content="Browser PlayGround Engine">
+	<meta name="mobile-web-app-capable" content="yes">
+
+	<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+	<svg width="0" height="0" style="position:absolute">
+		<defs>
+			<symbol id="icon-play" viewBox="0 0 24 24"><path fill="currentColor" d="M8 5v14l11-7z"/></symbol>
+			<symbol id="icon-settings" viewBox="0 0 24 24"><path fill="currentColor" d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></symbol>
+			<symbol id="icon-keyboard" viewBox="0 0 24 24"><path fill="currentColor" d="M20 5H4c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm-9 3h2v2h-2V8zm0 3h2v2h-2v-2zM8 8h2v2H8V8zm0 3h2v2H8v-2zm-1 2H5v-2h2v2zm0-3H5V8h2v2zm9 7H8v-2h8v2zm0-4h-2v-2h2v2zm0-3h-2V8h2v2zm3 3h-2v-2h2v2zm0-3h-2V8h2v2z"/></symbol>
+			<symbol id="icon-info" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></symbol>
+			<symbol id="icon-back" viewBox="0 0 24 24"><path fill="currentColor" d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></symbol>
+			<symbol id="icon-versus" viewBox="0 0 24 24"><path fill="currentColor" d="M9 3L3 21h2.5l1.2-4h4.6l1.2 4H15L9 3zm-2 12l1.9-6 1.9 6H7zm11 6l4.5-18H20l-2.5 12L15 3h-2.5l4.5 18h1z"/></symbol>
+			<symbol id="icon-user" viewBox="0 0 24 24"><path fill="currentColor" d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></symbol>
+			<symbol id="icon-logout" viewBox="0 0 24 24"><path fill="currentColor" d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5-5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"/></symbol>
+			<symbol id="icon-heart" viewBox="0 0 24 24"><path fill="currentColor" d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></symbol>
+			<symbol id="icon-trophy" viewBox="0 0 24 24"><path fill="currentColor" d="M7 3v2H3v6c0 2.21 1.79 4 4 4h1c.31 2.16 1.84 3.94 4 4.44V21h-3v2h8v-2h-3v-1.56c2.16-.5 3.69-2.28 4-4.44h1c2.21 0 4-1.79 4-4V5h-4V3H7zm0 4v6H5V7h2zm12 0v6h-2V7h2z"/></symbol>
+			<symbol id="icon-card" viewBox="0 0 24 24"><path fill="currentColor" d="M20 4H4c-1.11 0-1.99.89-1.99 2L2 18c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V6c0-1.11-.89-2-2-2zm0 14H4v-6h16v6zm0-10H4V6h16v2z"/></symbol>
+			<symbol id="icon-crown" viewBox="0 0 24 24"><path fill="currentColor" d="M12 6l3 5.5L18 6l1 12H5l1-12 3 5.5L12 6z"/></symbol>
+			<symbol id="icon-check" viewBox="0 0 24 24"><path fill="currentColor" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></symbol>
+			<symbol id="icon-download" viewBox="0 0 24 24"><path fill="currentColor" d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></symbol>
+			<symbol id="icon-close" viewBox="0 0 24 24"><path fill="currentColor" d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></symbol>
+			<symbol id="icon-handshake" viewBox="0 0 24 24"><path fill="currentColor" d="M11 2v2H9V2h2zm6 3l-3 3v2h-2v-2l-3-3H6v2l3 3v2h6v-2l3-3V5h-1zM4 12v8h16v-8h-2v6H6v-6H4z"/></symbol>
+			<symbol id="icon-speedometer" viewBox="0 0 24 24"><path fill="currentColor" d="M12 4C7.03 4 3 8.03 3 13c0 2.36.91 4.51 2.39 6.11.28.3.73.36 1.08.14.35-.22.47-.68.29-1.05C5.65 16.87 5 14.99 5 13c0-3.87 3.13-7 7-7s7 3.13 7 7c0 1.99-.65 3.87-1.76 5.2-.18.37-.06.83.29 1.05.35.22.8.16 1.08-.14C20.09 17.51 21 15.36 21 13c0-4.97-4.03-9-9-9zm3.5 5L11 13.5c-.4.4-.4 1.1 0 1.5s1.1.4 1.5 0L17 10.5c.4-.4.4-1.1 0-1.5s-1.1-.4-1.5 0z"/></symbol>
+		</defs>
+	</svg>
+
+	<!-- LOGIN / SIGNUP -->
+	<div id="authScreen">
+		<div class="menu-bg"></div>
+		<div class="auth-box">
+			<img src="/icons/icon-192.png" alt="Logo" class="auth-logo">
+			<h1 class="auth-title">GODOT PLAYGROUND</h1>
+			<p class="auth-tagline">ENGINE | FPS SANDBOX</p>
+
+			<div class="auth-tabs">
+				<button class="auth-tab active" id="loginTab">LOGIN</button>
+				<button class="auth-tab" id="signupTab">SIGN UP</button>
+			</div>
+
+			<div class="auth-form">
+				<input type="text" id="usernameInput" placeholder="USERNAME" maxlength="20" autocomplete="off">
+				<input type="password" id="passwordInput" placeholder="PASSWORD" maxlength="30">
+				<div id="authError" class="auth-error"></div>
+				<button id="submitAuthBtn" class="mbtn primary">
+					<svg class="mbtn-icon"><use href="#icon-play"/></svg> <span id="submitBtnText">LOGIN</span>
+				</button>
+				<button id="guestBtn" class="mbtn">
+					<svg class="mbtn-icon"><use href="#icon-user"/></svg> PLAY AS GUEST
+				</button>
+			</div>
+		</div>
+		<p class="watermark">Made By Hussein E</p>
+	</div>
+
+	<!-- MAIN MENU -->
+	<div id="mainMenu" class="hidden">
+		<div class="menu-bg"></div>
+		<div class="menu-content">
+			<img src="/icons/icon-192.png" alt="Logo" class="main-logo">
+			<h1 class="game-title">GODOT PLAYGROUND</h1>
+			<p class="game-tagline">ENGINE | FPS SANDBOX</p>
+			<div class="user-badge" id="userBadge">
+				<svg class="mbtn-icon"><use href="#icon-user"/></svg>
+				<span id="loggedInName">Player</span>
+				<span class="stats-mini" id="userStats">0W / 0L</span>
+			</div>
+			<div class="title-line"></div>
+			<div class="menu-buttons">
+				<button id="startBtn" class="mbtn primary">
+					<svg class="mbtn-icon"><use href="#icon-play"/></svg> PLAYGROUND
+				</button>
+				<button id="ball1v1Btn" class="mbtn primary">
+					<svg class="mbtn-icon"><use href="#icon-versus"/></svg> BALL 1V1
+				</button>
+				<button id="leaderboardBtn" class="mbtn">
+					<svg class="mbtn-icon"><use href="#icon-trophy"/></svg> LEADERBOARD
+				</button>
+				<button id="donorBoardBtn" class="mbtn">
+					<svg class="mbtn-icon"><use href="#icon-crown"/></svg> TOP DONORS
+				</button>
+				<button id="settingsBtn" class="mbtn">
+					<svg class="mbtn-icon"><use href="#icon-settings"/></svg> SETTINGS
+				</button>
+				<button id="ctrlBtn" class="mbtn">
+					<svg class="mbtn-icon"><use href="#icon-keyboard"/></svg> CONTROLS
+				</button>
+				<button id="aboutBtn" class="mbtn">
+					<svg class="mbtn-icon"><use href="#icon-info"/></svg> ABOUT
+				</button>
+				<button id="donateBtn" class="mbtn donate">
+					<svg class="mbtn-icon"><use href="#icon-heart"/></svg> DONATE
+				</button>
+				<button id="logoutBtn" class="mbtn">
+					<svg class="mbtn-icon"><use href="#icon-logout"/></svg> LOGOUT
+				</button>
+			</div>
+			<p class="version">v1.0.0 | Godot PlayGround Engine</p>
+			<p class="watermark">Made By Hussein E</p>
+		</div>
+	</div>
+
+	<!-- SETTINGS -->
+	<div id="settingsPanel" class="overlay-panel hidden">
+		<div class="panel-box">
+			<h2>SETTINGS</h2>
+			<div class="setting-row">
+				<label>Graphics Preset</label>
+				<select id="graphicsPreset">
+					<option value="potato">Potato (Low-End Devices)</option>
+					<option value="performance">Performance</option>
+					<option value="balanced" selected>Balanced</option>
+					<option value="ultra">Ultra Realistic</option>
+				</select>
+			</div>
+			<div class="setting-row">
+				<label>Sky / Time of Day</label>
+				<select id="skyMode">
+					<option value="day" selected>Sunny Day</option>
+					<option value="sunset">Sunset</option>
+					<option value="night">Night</option>
+					<option value="storm">Storm</option>
+					<option value="alien">Alien Purple</option>
+					<option value="blood">Blood Red</option>
+					<option value="green">Toxic Green</option>
+				</select>
+			</div>
+			<div class="setting-row">
+				<label>Clouds</label>
+				<select id="cloudsToggle"><option value="on" selected>On</option><option value="off">Off</option></select>
+			</div>
+			<div class="setting-row">
+				<label>Sun</label>
+				<select id="sunToggle"><option value="on" selected>On</option><option value="off">Off</option></select>
+			</div>
+			<div class="setting-row">
+				<label>Shadow Quality</label>
+				<select id="shadowQuality">
+					<option value="off">Off</option><option value="low">Low</option>
+					<option value="high" selected>High</option><option value="ultra">Ultra</option>
+				</select>
+			</div>
+			<div class="setting-row">
+				<label>FOV</label>
+				<input type="range" id="fovSlider" min="60" max="110" value="70">
+				<span id="fovVal">70</span>
+			</div>
+			<div class="setting-row">
+				<label>Mouse Sensitivity</label>
+				<input type="range" id="sensSlider" min="1" max="20" value="10">
+				<span id="sensVal">10</span>
+			</div>
+			<div class="setting-row">
+				<label>Master Volume</label>
+				<input type="range" id="volSlider" min="0" max="100" value="75">
+				<span id="volVal">75</span>
+			</div>
+			<button class="mbtn" id="settingsBack"><svg class="mbtn-icon"><use href="#icon-back"/></svg> BACK</button>
+		</div>
+	</div>
+
+	<!-- CONTROLS -->
+	<div id="controlsPanel" class="overlay-panel hidden">
+		<div class="panel-box">
+			<h2>CONTROLS</h2>
+			<div class="ctrl-grid">
+				<div class="ctrl-row"><span class="kbd">W A S D</span><span>Move</span></div>
+				<div class="ctrl-row"><span class="kbd">MOUSE</span><span>Look Around</span></div>
+				<div class="ctrl-row"><span class="kbd">LMB</span><span>Shoot AK-47</span></div>
+				<div class="ctrl-row"><span class="kbd">RMB</span><span>Throw Ball</span></div>
+				<div class="ctrl-row"><span class="kbd">SHIFT + W</span><span>Sprint</span></div>
+				<div class="ctrl-row"><span class="kbd">T</span><span>Crouch</span></div>
+				<div class="ctrl-row"><span class="kbd">F</span><span>Toggle Auto-Fire</span></div>
+				<div class="ctrl-row"><span class="kbd">SPACE</span><span>Jump / Uncrouch</span></div>
+				<div class="ctrl-row"><span class="kbd">CTRL</span><span>Chat</span></div>
+				<div class="ctrl-row"><span class="kbd">Y</span><span>Quick Chat</span></div>
+				<div class="ctrl-row"><span class="kbd">ESC</span><span>Pause / Menu</span></div>
+			</div>
+			<button class="mbtn" id="ctrlBack"><svg class="mbtn-icon"><use href="#icon-back"/></svg> BACK</button>
+		</div>
+	</div>
+
+	<!-- ABOUT -->
+	<div id="aboutPanel" class="overlay-panel hidden">
+		<div class="panel-box">
+			<h2>ABOUT</h2>
+			<img src="/icons/icon-192.png" alt="Logo" class="about-logo">
+			<p class="about-txt">Godot PlayGround Engine is a browser FPS sandbox with real-time multiplayer.</p>
+			<p class="about-txt">Sign up, queue up, and race real players in Ball 1v1!</p>
+			<p class="about-txt">Donate to earn a spot on the Top Donors board!</p>
+			<p class="about-credits">Made By Hussein E</p>
+			<button class="mbtn" id="aboutBack"><svg class="mbtn-icon"><use href="#icon-back"/></svg> BACK</button>
+		</div>
+	</div>
+
+	<!-- WINS LEADERBOARD -->
+	<div id="leaderboardPanel" class="overlay-panel hidden">
+		<div class="panel-box leaderboard-box">
+			<div class="leaderboard-header">
+				<svg class="trophy-svg-icon"><use href="#icon-trophy"/></svg>
+				<h2>LEADERBOARD</h2>
+				<p class="leaderboard-sub">TOP 10 GODOT WARRIORS</p>
+			</div>
+			<div id="leaderboardList" class="leaderboard-list">
+				<div class="lb-loading">Loading rankings...</div>
+			</div>
+			<div class="leaderboard-footer">
+				<p id="leaderboardTotal">0 players registered</p>
+			</div>
+			<button class="mbtn" id="leaderboardBack">
+				<svg class="mbtn-icon"><use href="#icon-back"/></svg> BACK
+			</button>
+		</div>
+	</div>
+
+	<!-- DONOR LEADERBOARD -->
+	<div id="donorBoardPanel" class="overlay-panel hidden">
+		<div class="panel-box leaderboard-box donor-board">
+			<div class="leaderboard-header">
+				<svg class="trophy-svg-icon"><use href="#icon-crown"/></svg>
+				<h2>TOP DONORS</h2>
+				<p class="leaderboard-sub">MOST GENEROUS SUPPORTERS</p>
+			</div>
+			<div id="donorList" class="leaderboard-list">
+				<div class="lb-loading">Loading donors...</div>
+			</div>
+			<div class="leaderboard-footer">
+				<p id="donorTotal">$0.00 total donated</p>
+				<p class="donor-cta">Donate to appear on this list!</p>
+			</div>
+			<button class="mbtn" id="donorBoardBack">
+				<svg class="mbtn-icon"><use href="#icon-back"/></svg> BACK
+			</button>
+		</div>
+	</div>
+
+	<!-- DONATE POPUP -->
+	<div id="donatePopup" class="overlay-panel hidden">
+		<div class="panel-box donate-box">
+			<svg class="donate-heart-svg"><use href="#icon-heart"/></svg>
+			<h2>SUPPORT THE GAME</h2>
+			<p class="donate-text">Godot PlayGround Engine is 100% free.<br>Donate to appear on the Top Donors board!</p>
+
+			<div class="donate-amounts">
+				<button class="donate-amount" data-cents="50">$0.50</button>
+				<button class="donate-amount active" data-cents="100">$1</button>
+				<button class="donate-amount" data-cents="300">$3</button>
+				<button class="donate-amount" data-cents="500">$5</button>
+			</div>
+
+			<input type="number" id="customAmount" placeholder="Custom amount ($)" min="0.50" step="0.50">
+
+			<div class="card-label">
+				<svg class="mbtn-icon"><use href="#icon-card"/></svg>
+				<span>Card Details</span>
+			</div>
+			<div id="stripeCardContainer">
+				<div id="stripeCardElement"></div>
+			</div>
+
+			<div id="donateError" class="auth-error"></div>
+			<div id="donateSuccess" class="donate-success hidden">
+				<svg class="success-check-svg"><use href="#icon-check"/></svg>
+				<h3>THANK YOU!</h3>
+				<p>You're now on the donor leaderboard!</p>
+			</div>
+
+			<button id="donateSubmitBtn" class="mbtn primary">
+				<svg class="mbtn-icon"><use href="#icon-heart"/></svg> DONATE <span id="donateAmountLabel">$1.00</span>
+			</button>
+
+			<p class="donate-note">Secure via Stripe · Min $0.50</p>
+			<button class="mbtn" id="donateBack">
+				<svg class="mbtn-icon"><use href="#icon-back"/></svg> BACK
+			</button>
+		</div>
+	</div>
+
+	<!-- LOADING -->
+	<div id="loading" class="hidden">
+		<img src="/icons/icon-192.png" alt="" class="loading-logo">
+		<h2>LOADING</h2>
+		<div class="load-bar"><div class="load-fill" id="loadFill"></div></div>
+		<p id="loadMsg">Initializing engine...</p>
+	</div>
+
+	<!-- QUEUE -->
+	<div id="queueScreen" class="hidden">
+		<div class="queue-box">
+			<img src="/icons/icon-192.png" class="queue-logo" alt="">
+			<div class="queue-spinner"></div>
+			<h2 id="queueStatus">SEARCHING FOR OPPONENT</h2>
+			<p id="queueSubtext">Please wait...</p>
+			<button class="mbtn" id="cancelQueueBtn"><svg class="mbtn-icon"><use href="#icon-back"/></svg> CANCEL</button>
+		</div>
+		<p class="watermark">Made By Hussein E</p>
+	</div>
+
+	<!-- MATCH FOUND -->
+	<div id="matchFoundOverlay" class="hidden">
+		<div class="match-found-box">
+			<h1 class="match-found-title">MATCH FOUND!</h1>
+			<div class="vs-display">
+				<div class="vs-side"><div class="vs-label" id="foundMyName">YOU</div></div>
+				<div class="vs-text">VS</div>
+				<div class="vs-side"><div class="vs-label" id="foundOpponentName">OPPONENT</div></div>
+			</div>
+			<p class="match-found-sub">Get ready to shoot balls!</p>
+		</div>
+	</div>
+
+	<!-- IN-GAME -->
+	<div id="infoOverlay" class="hidden">
+		<div id="topBar">
+			<div class="stat-block">
+				<img src="/icons/icon-192.png" alt="" class="hud-logo">
+				<span class="game-name">GODOT PLAYGROUND</span>
+			</div>
+			<div id="fpsBox">FPS: <span id="fpsNum">60</span></div>
+		</div>
+		<div id="crosshair">
+			<div class="ch t"></div><div class="ch b"></div><div class="ch l"></div><div class="ch r"></div><div class="ch dot"></div>
+		</div>
+		<div id="bottomHUD">
+			<div class="hud-left">
+				<div class="hud-item">
+					<span class="hud-label">HEALTH</span>
+					<div class="hud-bar-bg"><div class="hud-bar hp" id="hpBar"></div></div>
+					<span class="hud-num" id="hpNum">100</span>
+				</div>
+				<div class="hud-item">
+					<span class="hud-label">ARMOR</span>
+					<div class="hud-bar-bg"><div class="hud-bar ar" id="arBar"></div></div>
+					<span class="hud-num" id="arNum">50</span>
+				</div>
+			</div>
+			<div class="hud-right">
+				<div class="score-box">
+					<span class="score-label">SCORE</span>
+					<span class="score-val" id="scoreNum">0</span>
+				</div>
+				<div class="ammo-box">
+					<span class="ammo-cur" id="ammoCur">&#8734;</span>
+					<span class="ammo-lbl">BALLS</span>
+				</div>
+			</div>
+		</div>
+
+		<!-- WEAPON HUD - ONLY AK-47 -->
+		<div id="weaponHUD" class="hidden">
+			<div class="weapon-current">
+				<span class="weapon-current-label">EQUIPPED</span>
+				<span class="weapon-current-name" id="currentWeaponName">AK-47</span>
+			</div>
+			<div class="weapon-slots">
+				<div class="weapon-slot active" data-idx="0"><span class="ws-num">1</span><span class="ws-name">AK-47</span></div>
+			</div>
+		</div>
+
+		<div id="clickPrompt">
+			<div class="click-inner">
+				<div class="click-icon">
+					<svg width="60" height="60" viewBox="0 0 24 24"><path fill="currentColor" d="M13 3h-2v10h2V3zm4.83 2.17l-1.42 1.42C17.99 7.86 19 9.81 19 12c0 3.87-3.13 7-7 7s-7-3.13-7-7c0-2.19 1.01-4.14 2.58-5.42L6.17 5.17C4.23 6.82 3 9.26 3 12c0 4.97 4.03 9 9 9s9-4.03 9-9c0-2.74-1.23-5.18-3.17-6.83z"/></svg>
+				</div>
+				<div class="click-txt">CLICK TO PLAY</div>
+				<div class="click-sub">W A S D — MOVE | SHIFT — SPRINT | T — CROUCH | LMB — SHOOT | RMB — THROW BALL | F — AUTO-FIRE | ESC — MENU</div>
+			</div>
+		</div>
+		<button id="quitToMenuBtn" class="quit-btn">QUIT TO MENU</button>
+	</div>
+
+	<!-- CHAT -->
+	<div id="chatContainer" class="hidden">
+		<div id="chatMessages"></div>
+		<div id="chatInputWrap" class="hidden">
+			<span class="chat-prefix">SAY:</span>
+			<input type="text" id="chatInput" maxlength="100" placeholder="Type message... (Enter to send)">
+		</div>
+		<div id="chatHint">Press <span class="chat-key">CTRL</span> to chat · <span class="chat-key">Y</span> for quick messages</div>
+	</div>
+
+	<!-- QUICK CHAT WHEEL -->
+	<div id="quickChatWheel" class="hidden">
+		<div class="qc-inner">
+			<div class="qc-title">QUICK CHAT</div>
+			<div class="qc-grid">
+				<button class="qc-btn" data-msg="GG">GG</button>
+				<button class="qc-btn" data-msg="Nice shot!">Nice shot!</button>
+				<button class="qc-btn" data-msg="Good luck!">Good luck!</button>
+				<button class="qc-btn" data-msg="Too easy">Too easy</button>
+				<button class="qc-btn" data-msg="Oof!">Oof!</button>
+				<button class="qc-btn" data-msg="LOL">LOL</button>
+				<button class="qc-btn" data-msg="Take that!">Take that!</button>
+				<button class="qc-btn" data-msg="Fire!">Fire!</button>
+				<button class="qc-btn" data-msg="Well played">Well played</button>
+			</div>
+			<div class="qc-close">Press Y again to close</div>
+		</div>
+	</div>
+
+	<!-- BALL 1V1 HUD -->
+	<div id="ball1v1HUD" class="hidden">
+		<div class="match-scoreboard">
+			<div class="score-side player">
+				<div class="score-label-big" id="myNameLabel">YOU</div>
+				<div class="score-value-big" id="playerScoreVal">0</div>
+			</div>
+			<div class="match-timer-box">
+				<div class="timer-label">TIME</div>
+				<div class="timer-val" id="matchTimer">60</div>
+			</div>
+			<div class="score-side bot">
+				<div class="score-label-big" id="opponentNameLabel">OPPONENT</div>
+				<div class="score-value-big" id="botScoreVal">0</div>
+			</div>
+		</div>
+	</div>
+
+	<!-- PAUSE -->
+	<div id="pauseMenu" class="hidden">
+		<div class="pause-box">
+			<h2>PAUSED</h2>
+			<button class="mbtn primary" id="resumeBtn"><svg class="mbtn-icon"><use href="#icon-play"/></svg> RESUME</button>
+			<button class="mbtn" id="quitFromPauseBtn"><svg class="mbtn-icon"><use href="#icon-back"/></svg> QUIT TO MENU</button>
+		</div>
+	</div>
+
+	<!-- END SCREEN -->
+	<div id="endScreen" class="hidden">
+		<div class="end-box">
+			<div id="endIcon" class="end-icon"></div>
+			<h1 id="endTitle" class="end-title">GODOT VICTORY</h1>
+			<p id="endSubtitle" class="end-subtitle">YOU WON!</p>
+			<div class="final-scores">
+				<div class="final-score">
+					<span>YOU</span>
+					<strong id="finalPlayerScore">0</strong>
+				</div>
+				<div class="final-vs">VS</div>
+				<div class="final-score">
+					<span>OPPONENT</span>
+					<strong id="finalBotScore">0</strong>
+				</div>
+			</div>
+			<button id="playAgainBtn" class="mbtn primary"><svg class="mbtn-icon"><use href="#icon-play"/></svg> PLAY AGAIN</button>
+			<button id="backMenuBtn" class="mbtn"><svg class="mbtn-icon"><use href="#icon-back"/></svg> MAIN MENU</button>
+		</div>
+		<p class="watermark">Made By Hussein E</p>
+	</div>
+
+	<script type="importmap">
+	{
+		"imports": {
+			"three": "./build/three.module.js",
+			"three/addons/": "./jsm/"
+		}
+	}
+	</script>
+
+	<script src="https://js.stripe.com/v3/"></script>
+	<script type="module" src="script.js"></script>
+
+	<script>
+	if ('serviceWorker' in navigator) {
+		window.addEventListener('load', () => {
+			navigator.serviceWorker.register('/sw.js').catch(() => {});
+		});
+	}
+
+	let deferredPrompt = null;
+	window.addEventListener('beforeinstallprompt', (e) => {
+		e.preventDefault();
+		deferredPrompt = e;
+		const btn = document.createElement('button');
+		btn.id = 'installPwaBtn';
+		btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" style="vertical-align:middle;margin-right:6px"><path fill="currentColor" d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>INSTALL APP';
+		btn.style.cssText = 'position:fixed;bottom:16px;left:16px;padding:10px 18px;background:linear-gradient(135deg,#4874ff,#00d4ff);color:#fff;border:none;font-family:Orbitron,sans-serif;font-size:12px;letter-spacing:3px;cursor:pointer;z-index:10001;box-shadow:0 4px 20px rgba(72,116,255,0.5);';
+		btn.onclick = async () => {
+			if (deferredPrompt) {
+				deferredPrompt.prompt();
+				const { outcome } = await deferredPrompt.userChoice;
+				if (outcome === 'accepted') btn.remove();
+				deferredPrompt = null;
+			}
+		};
+		document.body.appendChild(btn);
+	});
+
+	window.addEventListener('appinstalled', () => {
+		const btn = document.getElementById('installPwaBtn');
+		if (btn) btn.remove();
+	});
+	</script>
+</body>
+</html>

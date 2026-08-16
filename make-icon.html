@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html>
+<head><title>Icon Generator</title></head>
+<body style="background:#222;color:white;font-family:sans-serif;padding:20px;">
+<h2>Godot Playground Icon Generator</h2>
+<p>Right-click each icon and "Save Image As" with the exact filename shown. Save them to your <code>icons/</code> folder.</p>
+
+<div style="display:flex;gap:20px;flex-wrap:wrap;">
+	<div>
+		<h3>icon-192.png</h3>
+		<canvas id="c192" width="192" height="192" style="border:1px solid #444;"></canvas>
+	</div>
+	<div>
+		<h3>icon-512.png</h3>
+		<canvas id="c512" width="512" height="512" style="border:1px solid #444;"></canvas>
+	</div>
+	<div>
+		<h3>icon-maskable.png</h3>
+		<canvas id="cmask" width="512" height="512" style="border:1px solid #444;"></canvas>
+	</div>
+</div>
+
+<script>
+const img = new Image();
+img.crossOrigin = 'anonymous';
+img.onload = () => {
+	// Regular icons - logo at 55% with rounded background
+	draw('c192', 192, 0.55, true);
+	draw('c512', 512, 0.55, true);
+	// Maskable - logo smaller (45%) for safe zone, full background
+	draw('cmask', 512, 0.45, false);
+};
+img.onerror = () => alert('Failed to load Godot logo');
+img.src = 'https://godotengine.org/assets/press/icon_color.png';
+
+function draw(id, size, scale, rounded) {
+	const canvas = document.getElementById(id);
+	const ctx = canvas.getContext('2d');
+	
+	// Clear
+	ctx.clearRect(0, 0, size, size);
+	
+	if (rounded) {
+		// Draw rounded square background (like Android adaptive icons)
+		const radius = size * 0.22;
+		ctx.fillStyle = '#0d1428';
+		roundRect(ctx, 0, 0, size, size, radius);
+		ctx.fill();
+	} else {
+		// Full square background for maskable
+		ctx.fillStyle = '#0d1428';
+		ctx.fillRect(0, 0, size, size);
+	}
+	
+	// Draw logo centered with padding
+	const logoSize = size * scale;
+	const offset = (size - logoSize) / 2;
+	ctx.drawImage(img, offset, offset, logoSize, logoSize);
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+	ctx.beginPath();
+	ctx.moveTo(x + r, y);
+	ctx.lineTo(x + w - r, y);
+	ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+	ctx.lineTo(x + w, y + h - r);
+	ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+	ctx.lineTo(x + r, y + h);
+	ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+	ctx.lineTo(x, y + r);
+	ctx.quadraticCurveTo(x, y, x + r, y);
+	ctx.closePath();
+}
+</script>
+</body>
+</html>

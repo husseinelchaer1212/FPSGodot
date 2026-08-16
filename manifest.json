@@ -1,0 +1,26 @@
+{
+	"name": "Godot Playground Engine",
+	"short_name": "Godot",
+	"description": "Browser-based FPS sandbox with real multiplayer. Made By Hussein E",
+	"start_url": "/",
+	"scope": "/",
+	"display": "fullscreen",
+	"orientation": "landscape",
+	"background_color": "#050810",
+	"theme_color": "#4874ff",
+	"icons": [
+		{
+			"src": "/icons/icon-192.png",
+			"sizes": "512x512",
+			"type": "image/png",
+			"purpose": "any"
+		},
+		{
+			"src": "/icons/icon-512.png",
+			"sizes": "1024x1024",
+			"type": "image/png",
+			"purpose": "any"
+		}
+	],
+	"categories": ["games", "entertainment"]
+}
