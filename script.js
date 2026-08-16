@@ -5,6 +5,9 @@ import { Capsule } from 'three/addons/math/Capsule.js';
 import { Sky } from 'three/addons/objects/Sky.js';
 
 const $ = id => document.getElementById(id);
+// ==================== MOBILE DETECTION ====================
+const isMobile = /iPhone|iPad|iPod|Android|Mobile|Tablet/i.test(navigator.userAgent) || 
+                 (window.innerWidth <= 900 && 'ontouchstart' in window);
 
 const SETTINGS = {
 	graphics: 'balanced', sky: 'day', clouds: 'on', sun: 'on',
@@ -438,6 +441,7 @@ function quitToMenu() {
 	$('mainMenu').classList.remove('hidden');
 	if (document.pointerLockElement) document.exitPointerLock();
 	startLobbyMusic();
+	if (isMobile) $('mobileControls').classList.add('hidden');
 }
 
 function resumeGame() {
@@ -1748,6 +1752,28 @@ const SPRINT_RAMP_DOWN = 3.5;
 const BASE_SPEED = 25;
 const SPRINT_MAX_MULTIPLIER = 1.75;
 let sprintFovBoost = 0;
+// ==================== SCREEN SHAKE ====================
+let shakeIntensity = 0;
+let shakeDecay = 0;
+const shakeOffset = new THREE.Vector3();
+
+function triggerScreenShake(intensity = 0.04, decay = 0.9) {
+	shakeIntensity = intensity;
+	shakeDecay = decay;
+}
+
+function updateScreenShake() {
+	if (shakeIntensity > 0.001) {
+		shakeOffset.x = (Math.random() - 0.5) * shakeIntensity;
+		shakeOffset.y = (Math.random() - 0.5) * shakeIntensity;
+		camera.rotation.x += shakeOffset.x;
+		camera.rotation.y += shakeOffset.y;
+		shakeIntensity *= shakeDecay;
+	} else {
+		shakeIntensity = 0;
+	}
+}
+// =====================================================
 
 document.addEventListener('keydown', e => {
 	if (chatOpen) return;
@@ -1824,6 +1850,173 @@ document.body.addEventListener('mousemove', e => {
 });
 
 document.addEventListener('pointerlockchange', () => {
+	// ==================== MOBILE CONTROLS ====================
+if (isMobile) {
+	// Show mobile controls when game starts
+	const originalStartGame = startGame;
+	window.startGame = function() {
+		originalStartGame();
+		$('mobileControls').classList.remove('hidden');
+	};
+
+	// JOYSTICK for movement
+	const joystick = $('mobileJoystick');
+	const knob = $('mobileJoystickKnob');
+	let joystickActive = false;
+	let joystickStartX = 0, joystickStartY = 0;
+	const JOYSTICK_MAX = 50;
+
+	joystick.addEventListener('touchstart', (e) => {
+		e.preventDefault();
+		joystickActive = true;
+		const touch = e.touches[0];
+		const rect = joystick.getBoundingClientRect();
+		joystickStartX = rect.left + rect.width / 2;
+		joystickStartY = rect.top + rect.height / 2;
+	});
+
+	joystick.addEventListener('touchmove', (e) => {
+		e.preventDefault();
+		if (!joystickActive) return;
+		const touch = e.touches[0];
+		let dx = touch.clientX - joystickStartX;
+		let dy = touch.clientY - joystickStartY;
+		const dist = Math.sqrt(dx*dx + dy*dy);
+		if (dist > JOYSTICK_MAX) {
+			dx = (dx / dist) * JOYSTICK_MAX;
+			dy = (dy / dist) * JOYSTICK_MAX;
+		}
+		knob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+		
+		// Convert to WASD-like input
+		const threshold = 15;
+		keyStates['KeyW'] = dy < -threshold;
+		keyStates['KeyS'] = dy > threshold;
+		keyStates['KeyA'] = dx < -threshold;
+		keyStates['KeyD'] = dx > threshold;
+	});
+
+	joystick.addEventListener('touchend', (e) => {
+		e.preventDefault();
+		joystickActive = false;
+		knob.style.transform = 'translate(-50%, -50%)';
+		keyStates['KeyW'] = false;
+		keyStates['KeyS'] = false;
+		keyStates['KeyA'] = false;
+		keyStates['KeyD'] = false;
+	});
+
+	// LOOK AREA for camera
+	const lookArea = $('mobileLookArea');
+	let lookActive = false;
+	let lastLookX = 0, lastLookY = 0;
+
+	lookArea.addEventListener('touchstart', (e) => {
+		e.preventDefault();
+		lookActive = true;
+		const touch = e.touches[0];
+		lastLookX = touch.clientX;
+		lastLookY = touch.clientY;
+	});
+
+	lookArea.addEventListener('touchmove', (e) => {
+		e.preventDefault();
+		if (!lookActive) return;
+		const touch = e.touches[0];
+		const dx = touch.clientX - lastLookX;
+		const dy = touch.clientY - lastLookY;
+		lastLookX = touch.clientX;
+		lastLookY = touch.clientY;
+		
+		const sens = SETTINGS.sensitivity / 3000;
+		camera.rotation.y -= dx * sens;
+		camera.rotation.x -= dy * sens;
+		camera.rotation.x = Math.max(-MAX_PITCH, Math.min(MAX_PITCH, camera.rotation.x));
+	});
+
+	lookArea.addEventListener('touchend', (e) => {
+		e.preventDefault();
+		lookActive = false;
+	});
+
+	// SHOOT BUTTON (hold to auto-fire!)
+	const shootBtn = $('mobileShootBtn');
+	let mobileShooting = false;
+	let mobileShootInterval = null;
+
+	shootBtn.addEventListener('touchstart', (e) => {
+		e.preventDefault();
+		if (GameState.paused) return;
+		mobileShooting = true;
+		leftMouseDown = true;
+		shootGun();
+		// Auto-fire while held
+		mobileShootInterval = setInterval(() => {
+			if (mobileShooting && !GameState.paused) shootGun();
+		}, WEAPON.fireRate * 1000);
+	});
+
+	shootBtn.addEventListener('touchend', (e) => {
+		e.preventDefault();
+		mobileShooting = false;
+		leftMouseDown = false;
+		if (mobileShootInterval) {
+			clearInterval(mobileShootInterval);
+			mobileShootInterval = null;
+		}
+	});
+
+	// JUMP BUTTON
+	$('mobileJumpBtn').addEventListener('touchstart', (e) => {
+		e.preventDefault();
+		keyStates['Space'] = true;
+	});
+	$('mobileJumpBtn').addEventListener('touchend', (e) => {
+		e.preventDefault();
+		keyStates['Space'] = false;
+	});
+
+	// CROUCH BUTTON
+	$('mobileCrouchBtn').addEventListener('touchstart', (e) => {
+		e.preventDefault();
+		if (playerOnFloor && !isSliding) {
+			if (sprintCharge > 0.5 && slideCooldownTimer <= 0) {
+				isSliding = true;
+				slideTimer = SLIDE_DURATION;
+				isCrouching = true;
+				slideDirection.copy(playerVelocity).normalize();
+				playSlideSound();
+			} else {
+				isCrouching = !isCrouching;
+			}
+		}
+	});
+
+	// SPRINT BUTTON (hold)
+	$('mobileSprintBtn').addEventListener('touchstart', (e) => {
+		e.preventDefault();
+		keyStates['ShiftLeft'] = true;
+	});
+	$('mobileSprintBtn').addEventListener('touchend', (e) => {
+		e.preventDefault();
+		keyStates['ShiftLeft'] = false;
+	});
+
+	// PAUSE BUTTON
+	$('mobilePauseBtn').addEventListener('touchstart', (e) => {
+		e.preventDefault();
+		if (GameState.paused) resumeGame();
+		else pauseGame();
+	});
+
+	// Disable pointer lock on mobile (not needed)
+	const oldMouseDown = container.onmousedown;
+	container.removeEventListener('mousedown', () => {});
+	
+	// Hide click prompt on mobile
+	if ($('clickPrompt')) $('clickPrompt').style.display = 'none';
+}
+// =====================================================
 	if (document.pointerLockElement === document.body) $('clickPrompt').classList.add('hidden');
 	else if (GameState.started && !GameState.paused && !chatOpen && !quickChatOpen) $('clickPrompt').classList.remove('hidden');
 });
@@ -1858,6 +2051,7 @@ function shootGun() {
 		muzzleFlashTimer = 0.05;
 	}
 	gunRecoil = WEAPON.recoil;
+	triggerScreenShake(0.006, 0.75);
 	playGunshot(WEAPON.soundPitch);
 
 	camera.rotation.x += WEAPON.recoil * 0.15;
@@ -2266,7 +2460,7 @@ function animate() {
 		muzzleFlashTimer -= deltaTime * STEPS_PER_FRAME;
 		if (muzzleFlashTimer <= 0 && muzzleFlashModel) muzzleFlashModel.visible = false;
 	}
-
+	updateScreenShake();
 	if (GameState.started) renderer.render(scene, camera);
 
 	frameCount++;
