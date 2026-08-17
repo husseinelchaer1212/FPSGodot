@@ -92,6 +92,16 @@ let baseGunScene = null;
 const bulletHoles = [];
 let MAX_BULLET_HOLES = 200;
 
+// ==================== GRENADE SYSTEM ====================
+const GRENADE_FUSE = 3.0;
+const GRENADE_RADIUS = 12;
+const GRENADE_FORCE = 60;
+const GRENADE_COOLDOWN = 2.0;
+const GRENADE_SIZE = 0.12;
+let grenadeCooldownTimer = 0;
+const activeGrenades = [];
+// =========================================================
+
 function loadSocketIO() {
 	return new Promise((resolve) => {
 		if (window.io) { resolve(); return; }
@@ -1317,6 +1327,131 @@ function playSlideSound() {
 	} catch (e) {}
 }
 
+// ==================== GRENADE SOUND ====================
+function playExplosionSound() {
+	if (!audioCtx) return;
+	try {
+		const now = audioCtx.currentTime;
+
+		// Deep boom
+		const boom = audioCtx.createOscillator();
+		const boomGain = audioCtx.createGain();
+		boom.type = 'sine';
+		boom.frequency.setValueAtTime(80, now);
+		boom.frequency.exponentialRampToValueAtTime(15, now + 0.6);
+		boomGain.gain.setValueAtTime(0, now);
+		boomGain.gain.linearRampToValueAtTime(1.0, now + 0.005);
+		boomGain.gain.exponentialRampToValueAtTime(0.001, now + 0.8);
+		boom.connect(boomGain);
+		boomGain.connect(masterGain);
+		if (sharedReverbNode) boomGain.connect(sharedReverbNode);
+		if (echoDelay) boomGain.connect(echoDelay);
+		boom.start(now);
+		boom.stop(now + 0.8);
+
+		// Sub bass punch
+		const sub = audioCtx.createOscillator();
+		const subGain = audioCtx.createGain();
+		sub.type = 'sine';
+		sub.frequency.setValueAtTime(40, now);
+		sub.frequency.exponentialRampToValueAtTime(10, now + 0.5);
+		subGain.gain.setValueAtTime(0.9, now);
+		subGain.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
+		sub.connect(subGain);
+		subGain.connect(masterGain);
+		sub.start(now);
+		sub.stop(now + 0.6);
+
+		// Explosion noise burst
+		const bufferSize = audioCtx.sampleRate * 1.5;
+		const noiseBuffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+		const noiseData = noiseBuffer.getChannelData(0);
+		for (let i = 0; i < bufferSize; i++) {
+			const t = i / bufferSize;
+			const envelope = Math.pow(1 - t, 2.5);
+			noiseData[i] = (Math.random() * 2 - 1) * envelope;
+		}
+		const noise = audioCtx.createBufferSource();
+		noise.buffer = noiseBuffer;
+		const noiseFilter = audioCtx.createBiquadFilter();
+		noiseFilter.type = 'lowpass';
+		noiseFilter.frequency.setValueAtTime(2000, now);
+		noiseFilter.frequency.exponentialRampToValueAtTime(200, now + 1.0);
+		const noiseGain = audioCtx.createGain();
+		noiseGain.gain.setValueAtTime(0.7, now);
+		noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 1.5);
+		noise.connect(noiseFilter);
+		noiseFilter.connect(noiseGain);
+		noiseGain.connect(masterGain);
+		if (sharedReverbNode) noiseGain.connect(sharedReverbNode);
+		noise.start(now);
+		noise.stop(now + 1.5);
+
+		// Mid crackle
+		const crackle = audioCtx.createOscillator();
+		const crackleGain = audioCtx.createGain();
+		crackle.type = 'sawtooth';
+		crackle.frequency.setValueAtTime(300, now);
+		crackle.frequency.exponentialRampToValueAtTime(50, now + 0.3);
+		crackleGain.gain.setValueAtTime(0.4, now);
+		crackleGain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+		crackle.connect(crackleGain);
+		crackleGain.connect(masterGain);
+		crackle.start(now);
+		crackle.stop(now + 0.35);
+	} catch (e) {}
+}
+
+function playGrenadeBounceSound() {
+	if (!audioCtx) return;
+	try {
+		const now = audioCtx.currentTime;
+		const osc = audioCtx.createOscillator();
+		const gain = audioCtx.createGain();
+		osc.type = 'sine';
+		osc.frequency.setValueAtTime(800, now);
+		osc.frequency.exponentialRampToValueAtTime(200, now + 0.08);
+		gain.gain.setValueAtTime(0.15, now);
+		gain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+		osc.connect(gain);
+		gain.connect(masterGain);
+		osc.start(now);
+		osc.stop(now + 0.1);
+	} catch (e) {}
+}
+
+function playGrenadePinSound() {
+	if (!audioCtx) return;
+	try {
+		const now = audioCtx.currentTime;
+		const osc = audioCtx.createOscillator();
+		const gain = audioCtx.createGain();
+		osc.type = 'square';
+		osc.frequency.setValueAtTime(3000, now);
+		osc.frequency.exponentialRampToValueAtTime(1500, now + 0.05);
+		gain.gain.setValueAtTime(0.1, now);
+		gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+		osc.connect(gain);
+		gain.connect(masterGain);
+		osc.start(now);
+		osc.stop(now + 0.08);
+
+		// Metal clink
+		const clink = audioCtx.createOscillator();
+		const clinkGain = audioCtx.createGain();
+		clink.type = 'triangle';
+		clink.frequency.setValueAtTime(4500, now + 0.02);
+		clink.frequency.exponentialRampToValueAtTime(2000, now + 0.1);
+		clinkGain.gain.setValueAtTime(0.08, now + 0.02);
+		clinkGain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+		clink.connect(clinkGain);
+		clinkGain.connect(masterGain);
+		clink.start(now + 0.02);
+		clink.stop(now + 0.12);
+	} catch (e) {}
+}
+// =========================================================
+
 let chatOpen = false;
 let quickChatOpen = false;
 
@@ -1725,6 +1860,324 @@ function createImpactSmoke(position, normal) {
 	}
 }
 
+// ==================== GRENADE FUNCTIONS ====================
+function throwGrenade() {
+	if (GameState.paused) return;
+	if (grenadeCooldownTimer > 0) return;
+
+	grenadeCooldownTimer = GRENADE_COOLDOWN;
+	playGrenadePinSound();
+
+	// Create grenade mesh (dark green sphere with details)
+	const grenadeGeo = new THREE.SphereGeometry(GRENADE_SIZE, 12, 8);
+	const grenadeMat = new THREE.MeshStandardMaterial({
+		color: 0x2d4a1e,
+		roughness: 0.6,
+		metalness: 0.3,
+		emissive: 0x111100,
+		emissiveIntensity: 0.1
+	});
+	const grenadeMesh = new THREE.Mesh(grenadeGeo, grenadeMat);
+	grenadeMesh.castShadow = true;
+
+	// Add a small ring on top to make it look more like a grenade
+	const ringGeo = new THREE.TorusGeometry(GRENADE_SIZE * 0.5, GRENADE_SIZE * 0.12, 6, 8);
+	const ringMat = new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.3, metalness: 0.8 });
+	const ring = new THREE.Mesh(ringGeo, ringMat);
+	ring.position.y = GRENADE_SIZE * 0.8;
+	ring.rotation.x = Math.PI / 2;
+	grenadeMesh.add(ring);
+
+	scene.add(grenadeMesh);
+
+	// Set position and throw velocity
+	camera.getWorldDirection(playerDirection);
+	const startPos = playerCollider.end.clone().addScaledVector(playerDirection, playerCollider.radius * 1.5);
+	grenadeMesh.position.copy(startPos);
+
+	const throwForce = 25;
+	const velocity = playerDirection.clone().multiplyScalar(throwForce);
+	velocity.y += 8; // Arc upward
+	velocity.addScaledVector(playerVelocity, 1.5);
+
+	const grenadeCollider = new THREE.Sphere(startPos.clone(), GRENADE_SIZE);
+
+	const grenade = {
+		mesh: grenadeMesh,
+		collider: grenadeCollider,
+		velocity: velocity,
+		fuseTimer: GRENADE_FUSE,
+		bounceCount: 0,
+		alive: true
+	};
+
+	activeGrenades.push(grenade);
+
+	// Show grenade indicator
+	showGrenadeNotice();
+}
+
+function updateGrenades(deltaTime) {
+	for (let i = activeGrenades.length - 1; i >= 0; i--) {
+		const g = activeGrenades[i];
+		if (!g.alive) continue;
+
+		// Update fuse
+		g.fuseTimer -= deltaTime;
+
+		// Blink faster as fuse runs out
+		if (g.fuseTimer < 1.5) {
+			const blinkRate = g.fuseTimer < 0.5 ? 0.05 : g.fuseTimer < 1.0 ? 0.1 : 0.2;
+			const blink = Math.sin(performance.now() * (1 / blinkRate) * 0.01) > 0;
+			g.mesh.material.emissive.setHex(blink ? 0xff2200 : 0x111100);
+			g.mesh.material.emissiveIntensity = blink ? 0.8 : 0.1;
+		}
+
+		// Explode when fuse runs out
+		if (g.fuseTimer <= 0) {
+			explodeGrenade(g);
+			continue;
+		}
+
+		// Physics - gravity
+		g.velocity.y -= GRAVITY * deltaTime;
+
+		// Move
+		g.collider.center.addScaledVector(g.velocity, deltaTime);
+
+		// World collision (bounce off walls/floors)
+		const result = worldOctree.sphereIntersect(g.collider);
+		if (result) {
+			// Bounce
+			const dot = g.velocity.dot(result.normal);
+			g.velocity.addScaledVector(result.normal, -dot * 1.8);
+			g.collider.center.add(result.normal.clone().multiplyScalar(result.depth));
+
+			// Dampen on bounce
+			g.velocity.multiplyScalar(0.5);
+
+			// Play bounce sound (limit to avoid spam)
+			if (g.bounceCount < 5 && Math.abs(dot) > 2) {
+				playGrenadeBounceSound();
+			}
+			g.bounceCount++;
+		}
+
+		// Air damping
+		const damping = Math.exp(-0.5 * deltaTime) - 1;
+		g.velocity.addScaledVector(g.velocity, damping);
+
+		// Spin the grenade
+		g.mesh.rotation.x += g.velocity.z * deltaTime * 2;
+		g.mesh.rotation.z -= g.velocity.x * deltaTime * 2;
+
+		// Update mesh position
+		g.mesh.position.copy(g.collider.center);
+	}
+}
+
+function explodeGrenade(grenade) {
+	grenade.alive = false;
+	const pos = grenade.collider.center.clone();
+
+	// Remove grenade mesh
+	scene.remove(grenade.mesh);
+	grenade.mesh.geometry.dispose();
+	grenade.mesh.material.dispose();
+
+	// Remove from active list
+	const idx = activeGrenades.indexOf(grenade);
+	if (idx !== -1) activeGrenades.splice(idx, 1);
+
+	// Play explosion sound
+	playExplosionSound();
+
+	// Screen shake
+	const distToPlayer = pos.distanceTo(camera.position);
+	const shakeAmount = Math.max(0, 0.15 - distToPlayer * 0.005);
+	if (shakeAmount > 0) triggerScreenShake(shakeAmount, 0.85);
+
+	// Push all nearby balls
+	spheres.forEach(s => {
+		if (!s.alive) return;
+		const dist = s.collider.center.distanceTo(pos);
+		if (dist < GRENADE_RADIUS) {
+			const force = (1 - dist / GRENADE_RADIUS) * GRENADE_FORCE;
+			const dir = s.collider.center.clone().sub(pos).normalize();
+			s.velocity.addScaledVector(dir, force);
+			s.velocity.y += force * 0.5;
+
+			// Flash the ball
+			const origColor = s.mesh.material.color.getHex();
+			s.mesh.material.emissive.setHex(0xff4400);
+			s.mesh.material.emissiveIntensity = 1.0;
+			setTimeout(() => {
+				s.mesh.material.emissive.setHex(origColor);
+				s.mesh.material.emissiveIntensity = 0.2;
+			}, 300);
+		}
+	});
+
+	// Push the player if close
+	if (distToPlayer < GRENADE_RADIUS) {
+		const pushForce = (1 - distToPlayer / GRENADE_RADIUS) * GRENADE_FORCE * 0.6;
+		const pushDir = camera.position.clone().sub(pos).normalize();
+		playerVelocity.addScaledVector(pushDir, pushForce);
+		playerVelocity.y += pushForce * 0.4;
+	}
+
+	// Create explosion visual effects
+	createExplosionEffect(pos);
+}
+
+function createExplosionEffect(position) {
+	// Flash light
+	const flashLight = new THREE.PointLight(0xff6600, 15, 20, 2);
+	flashLight.position.copy(position);
+	scene.add(flashLight);
+
+	const flashStart = performance.now();
+	function animateFlash() {
+		const elapsed = performance.now() - flashStart;
+		const t = elapsed / 500;
+		if (t >= 1) {
+			scene.remove(flashLight);
+			return;
+		}
+		flashLight.intensity = 15 * (1 - t);
+		requestAnimationFrame(animateFlash);
+	}
+	animateFlash();
+
+	// Fireball core
+	const fireballGeo = new THREE.SphereGeometry(0.3, 12, 8);
+	const fireballMat = new THREE.MeshBasicMaterial({
+		color: 0xff4400,
+		transparent: true,
+		opacity: 1.0
+	});
+	const fireball = new THREE.Mesh(fireballGeo, fireballMat);
+	fireball.position.copy(position);
+	scene.add(fireball);
+
+	const fbStart = performance.now();
+	function animateFireball() {
+		const elapsed = performance.now() - fbStart;
+		const t = elapsed / 400;
+		if (t >= 1) {
+			scene.remove(fireball);
+			fireballMat.dispose();
+			fireballGeo.dispose();
+			return;
+		}
+		const scale = 1 + t * 8;
+		fireball.scale.setScalar(scale);
+		fireballMat.opacity = 1 - t;
+		fireball.material.color.setHex(t < 0.3 ? 0xffff44 : t < 0.6 ? 0xff6600 : 0x882200);
+		requestAnimationFrame(animateFireball);
+	}
+	animateFireball();
+
+	// Smoke puffs
+	if (SETTINGS.graphics !== 'potato') {
+		const smokeTex = createSmokeTexture();
+		const smokeCount = SETTINGS.graphics === 'performance' ? 6 : 12;
+		for (let i = 0; i < smokeCount; i++) {
+			const size = 0.4 + Math.random() * 0.6;
+			const mat = new THREE.SpriteMaterial({
+				map: smokeTex,
+				transparent: true,
+				opacity: 0.9,
+				depthWrite: false,
+				color: i < smokeCount / 2 ? 0x443322 : 0x888877
+			});
+			const smoke = new THREE.Sprite(mat);
+			smoke.scale.set(size, size, 1);
+			smoke.position.copy(position);
+
+			const vel = new THREE.Vector3(
+				(Math.random() - 0.5) * 8,
+				2 + Math.random() * 6,
+				(Math.random() - 0.5) * 8
+			);
+
+			scene.add(smoke);
+			const startTime = performance.now();
+			const duration = 800 + Math.random() * 800;
+			function animSmoke() {
+				const elapsed = performance.now() - startTime;
+				const t = elapsed / duration;
+				if (t >= 1) {
+					scene.remove(smoke);
+					mat.dispose();
+					return;
+				}
+				smoke.position.addScaledVector(vel, 0.016);
+				vel.multiplyScalar(0.93);
+				vel.y -= 0.03;
+				const s = size * (1 + t * 4);
+				smoke.scale.set(s, s, 1);
+				mat.opacity = 0.9 * Math.pow(1 - t, 1.5);
+				requestAnimationFrame(animSmoke);
+			}
+			animSmoke();
+		}
+
+		// Sparks / debris
+		const sparkCount = SETTINGS.graphics === 'performance' ? 8 : 20;
+		for (let i = 0; i < sparkCount; i++) {
+			const sparkGeo = new THREE.SphereGeometry(0.02 + Math.random() * 0.03, 4, 4);
+			const sparkMat = new THREE.MeshBasicMaterial({
+				color: Math.random() > 0.5 ? 0xff6600 : 0xffcc00,
+				transparent: true,
+				opacity: 1.0
+			});
+			const spark = new THREE.Mesh(sparkGeo, sparkMat);
+			spark.position.copy(position);
+
+			const sparkVel = new THREE.Vector3(
+				(Math.random() - 0.5) * 15,
+				3 + Math.random() * 12,
+				(Math.random() - 0.5) * 15
+			);
+
+			scene.add(spark);
+			const startTime = performance.now();
+			const duration = 300 + Math.random() * 500;
+			function animSpark() {
+				const elapsed = performance.now() - startTime;
+				const t = elapsed / duration;
+				if (t >= 1) {
+					scene.remove(spark);
+					sparkMat.dispose();
+					sparkGeo.dispose();
+					return;
+				}
+				spark.position.addScaledVector(sparkVel, 0.016);
+				sparkVel.y -= 0.3;
+				sparkMat.opacity = 1 - t;
+				requestAnimationFrame(animSpark);
+			}
+			animSpark();
+		}
+	}
+}
+
+function showGrenadeNotice() {
+	let notice = document.getElementById('grenadeNotice');
+	if (!notice) {
+		notice = document.createElement('div');
+		notice.id = 'grenadeNotice';
+		notice.style.cssText = 'position:fixed;top:160px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.7);color:#ff6600;padding:10px 22px;font-family:Orbitron,sans-serif;letter-spacing:3px;font-size:13px;border:1px solid rgba(255,102,0,0.5);z-index:100;pointer-events:none;border-radius:4px;';
+		document.body.appendChild(notice);
+	}
+	notice.textContent = '🔥 GRENADE THROWN';
+	notice.style.opacity = '1';
+	clearTimeout(notice._t);
+	notice._t = setTimeout(() => { notice.style.transition = 'opacity 0.5s'; notice.style.opacity = '0'; }, 1500);
+}
+// =========================================================
+
 // ==================== MOVEMENT STATE ====================
 let leftMouseDown = false;
 
@@ -1805,6 +2258,13 @@ document.addEventListener('keydown', e => {
 		e.preventDefault();
 		if (quickChatOpen) closeQuickChat();
 		else openQuickChat();
+		return;
+	}
+
+	// GRENADE - Press G to throw
+	if (e.code === 'KeyG' && GameState.started && !GameState.paused && document.pointerLockElement) {
+		e.preventDefault();
+		throwGrenade();
 		return;
 	}
 
@@ -2249,6 +2709,9 @@ function getSideVector() {
 function controls(deltaTime) {
 	if (slideCooldownTimer > 0) slideCooldownTimer -= deltaTime * STEPS_PER_FRAME;
 
+	// Update grenade cooldown
+	if (grenadeCooldownTimer > 0) grenadeCooldownTimer -= deltaTime * STEPS_PER_FRAME;
+
 	if (isSliding) {
 		slideTimer -= deltaTime * STEPS_PER_FRAME;
 		if (slideTimer <= 0 || !playerOnFloor) {
@@ -2403,6 +2866,7 @@ function animate() {
 			controls(deltaTime);
 			updatePlayer(deltaTime);
 			updateSpheres(deltaTime);
+			updateGrenades(deltaTime);
 			teleportPlayerIfOob();
 		}
 		if (GameState.autoFire && leftMouseDown && document.pointerLockElement) {
