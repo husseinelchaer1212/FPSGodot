@@ -90,7 +90,7 @@ const WEAPON = {
 let socket = null;
 let baseGunScene = null;
 const bulletHoles = [];
-let MAX_BULLET_HOLES = 50;
+let MAX_BULLET_HOLES = 200;
 
 function loadSocketIO() {
 	return new Promise((resolve) => {
@@ -1603,7 +1603,7 @@ function createBulletHole(position, normal) {
 		if (hole.parent) {
 			let opacity = 1;
 			const fadeInterval = setInterval(() => {
-				opacity -= 0.01;
+				opacity -= 0.02;
 				hole.material.opacity = opacity;
 				if (opacity <= 0) {
 					clearInterval(fadeInterval);
@@ -1615,9 +1615,9 @@ function createBulletHole(position, normal) {
 						if (idx !== -1) bulletHoles.splice(idx, 1);
 					}
 				}
-			}, 100);
+			}, 50);
 		}
-	}, 25000);
+	}, 15000);
 }
 
 let smokeTexture = null;
