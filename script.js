@@ -887,7 +887,7 @@ renderer.toneMapping = THREE.ACESFilmicToneMapping;
 container.appendChild(renderer.domElement);
 
 const GRAVITY = 30;
-const NUM_SPHERES = 60;
+const NUM_SPHERES = 1000;
 const SPHERE_RADIUS = 0.2;
 const STEPS_PER_FRAME = 3;
 
