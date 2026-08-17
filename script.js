@@ -92,6 +92,17 @@ let baseGunScene = null;
 const bulletHoles = [];
 let MAX_BULLET_HOLES = 200;
 
+// ==================== GRENADE SYSTEM ====================
+const GRENADE_FUSE = 3.0;
+const GRENADE_RADIUS = 12;
+const GRENADE_FORCE = 60;
+const GRENADE_COOLDOWN = 2.0;
+const GRENADE_BODY_RADIUS = 0.055;
+const GRENADE_BODY_HEIGHT = 0.1;
+let grenadeCooldownTimer = 0;
+const activeGrenades = [];
+// =========================================================
+
 function loadSocketIO() {
 	return new Promise((resolve) => {
 		if (window.io) { resolve(); return; }
@@ -1317,6 +1328,183 @@ function playSlideSound() {
 	} catch (e) {}
 }
 
+// ==================== GRENADE SOUNDS ====================
+function playExplosionSound() {
+	if (!audioCtx) return;
+	try {
+		const now = audioCtx.currentTime;
+
+		// Initial blast transient
+		const blast = audioCtx.createOscillator();
+		const blastGain = audioCtx.createGain();
+		blast.type = 'sawtooth';
+		blast.frequency.setValueAtTime(200, now);
+		blast.frequency.exponentialRampToValueAtTime(20, now + 0.15);
+		blastGain.gain.setValueAtTime(0, now);
+		blastGain.gain.linearRampToValueAtTime(0.9, now + 0.002);
+		blastGain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+		blast.connect(blastGain);
+		blastGain.connect(masterGain);
+		blast.start(now);
+		blast.stop(now + 0.2);
+
+		// Deep sub boom
+		const boom = audioCtx.createOscillator();
+		const boomGain = audioCtx.createGain();
+		boom.type = 'sine';
+		boom.frequency.setValueAtTime(60, now);
+		boom.frequency.exponentialRampToValueAtTime(12, now + 0.8);
+		boomGain.gain.setValueAtTime(0, now);
+		boomGain.gain.linearRampToValueAtTime(1.0, now + 0.003);
+		boomGain.gain.exponentialRampToValueAtTime(0.001, now + 1.0);
+		boom.connect(boomGain);
+		boomGain.connect(masterGain);
+		if (sharedReverbNode) boomGain.connect(sharedReverbNode);
+		if (echoDelay) boomGain.connect(echoDelay);
+		boom.start(now);
+		boom.stop(now + 1.0);
+
+		// Sub bass punch
+		const sub = audioCtx.createOscillator();
+		const subGain = audioCtx.createGain();
+		sub.type = 'sine';
+		sub.frequency.setValueAtTime(35, now);
+		sub.frequency.exponentialRampToValueAtTime(8, now + 0.6);
+		subGain.gain.setValueAtTime(0.8, now);
+		subGain.gain.exponentialRampToValueAtTime(0.001, now + 0.7);
+		sub.connect(subGain);
+		subGain.connect(masterGain);
+		sub.start(now);
+		sub.stop(now + 0.7);
+
+		// Explosion noise burst
+		const bufferSize = audioCtx.sampleRate * 2.0;
+		const noiseBuffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+		const noiseData = noiseBuffer.getChannelData(0);
+		for (let i = 0; i < bufferSize; i++) {
+			const t = i / bufferSize;
+			const envelope = Math.pow(1 - t, 3.0);
+			noiseData[i] = (Math.random() * 2 - 1) * envelope;
+		}
+		const noise = audioCtx.createBufferSource();
+		noise.buffer = noiseBuffer;
+		const noiseFilter = audioCtx.createBiquadFilter();
+		noiseFilter.type = 'lowpass';
+		noiseFilter.frequency.setValueAtTime(3000, now);
+		noiseFilter.frequency.exponentialRampToValueAtTime(100, now + 1.5);
+		const noiseGain = audioCtx.createGain();
+		noiseGain.gain.setValueAtTime(0.6, now);
+		noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 2.0);
+		noise.connect(noiseFilter);
+		noiseFilter.connect(noiseGain);
+		noiseGain.connect(masterGain);
+		if (sharedReverbNode) noiseGain.connect(sharedReverbNode);
+		noise.start(now);
+		noise.stop(now + 2.0);
+
+		// Tail rumble
+		const tailNoise = audioCtx.createBufferSource();
+		const tailBuffer = audioCtx.createBuffer(1, audioCtx.sampleRate * 1.5, audioCtx.sampleRate);
+		const tailData = tailBuffer.getChannelData(0);
+		for (let i = 0; i < tailBuffer.length; i++) {
+			const t = i / tailBuffer.length;
+			tailData[i] = (Math.random() * 2 - 1) * Math.pow(1 - t, 2) * 0.3;
+		}
+		tailNoise.buffer = tailBuffer;
+		const tailFilter = audioCtx.createBiquadFilter();
+		tailFilter.type = 'lowpass';
+		tailFilter.frequency.value = 400;
+		const tailGain = audioCtx.createGain();
+		tailGain.gain.setValueAtTime(0, now + 0.1);
+		tailGain.gain.linearRampToValueAtTime(0.35, now + 0.2);
+		tailGain.gain.exponentialRampToValueAtTime(0.001, now + 2.0);
+		tailNoise.connect(tailFilter);
+		tailFilter.connect(tailGain);
+		tailGain.connect(masterGain);
+		if (echoDelay) tailGain.connect(echoDelay);
+		tailNoise.start(now + 0.1);
+		tailNoise.stop(now + 2.0);
+	} catch (e) {}
+}
+
+function playGrenadeBounceSound() {
+	if (!audioCtx) return;
+	try {
+		const now = audioCtx.currentTime;
+		// Metal clank
+		const osc1 = audioCtx.createOscillator();
+		const gain1 = audioCtx.createGain();
+		osc1.type = 'triangle';
+		osc1.frequency.setValueAtTime(1800 + Math.random() * 400, now);
+		osc1.frequency.exponentialRampToValueAtTime(600, now + 0.04);
+		gain1.gain.setValueAtTime(0.12, now);
+		gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.06);
+		osc1.connect(gain1);
+		gain1.connect(masterGain);
+		osc1.start(now);
+		osc1.stop(now + 0.06);
+
+		// Dull thud
+		const osc2 = audioCtx.createOscillator();
+		const gain2 = audioCtx.createGain();
+		osc2.type = 'sine';
+		osc2.frequency.setValueAtTime(120, now);
+		osc2.frequency.exponentialRampToValueAtTime(40, now + 0.08);
+		gain2.gain.setValueAtTime(0.15, now);
+		gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+		osc2.connect(gain2);
+		gain2.connect(masterGain);
+		osc2.start(now);
+		osc2.stop(now + 0.1);
+	} catch (e) {}
+}
+
+function playGrenadePinSound() {
+	if (!audioCtx) return;
+	try {
+		const now = audioCtx.currentTime;
+		// Pin pull click
+		const click = audioCtx.createOscillator();
+		const clickGain = audioCtx.createGain();
+		click.type = 'square';
+		click.frequency.setValueAtTime(4000, now);
+		click.frequency.exponentialRampToValueAtTime(2000, now + 0.02);
+		clickGain.gain.setValueAtTime(0.06, now);
+		clickGain.gain.exponentialRampToValueAtTime(0.001, now + 0.03);
+		click.connect(clickGain);
+		clickGain.connect(masterGain);
+		click.start(now);
+		click.stop(now + 0.03);
+
+		// Spoon spring release
+		const spring = audioCtx.createOscillator();
+		const springGain = audioCtx.createGain();
+		spring.type = 'triangle';
+		spring.frequency.setValueAtTime(5000, now + 0.03);
+		spring.frequency.exponentialRampToValueAtTime(1200, now + 0.12);
+		springGain.gain.setValueAtTime(0.05, now + 0.03);
+		springGain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+		spring.connect(springGain);
+		springGain.connect(masterGain);
+		spring.start(now + 0.03);
+		spring.stop(now + 0.12);
+
+		// Metal ping
+		const ping = audioCtx.createOscillator();
+		const pingGain = audioCtx.createGain();
+		ping.type = 'sine';
+		ping.frequency.setValueAtTime(3200, now + 0.04);
+		ping.frequency.exponentialRampToValueAtTime(2800, now + 0.15);
+		pingGain.gain.setValueAtTime(0.04, now + 0.04);
+		pingGain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+		ping.connect(pingGain);
+		pingGain.connect(masterGain);
+		ping.start(now + 0.04);
+		ping.stop(now + 0.15);
+	} catch (e) {}
+}
+// =========================================================
+
 let chatOpen = false;
 let quickChatOpen = false;
 
@@ -1725,6 +1913,454 @@ function createImpactSmoke(position, normal) {
 	}
 }
 
+// ==================== GRENADE FUNCTIONS ====================
+function createGrenadeMesh() {
+	const group = new THREE.Group();
+
+	// Main body - cylinder with rounded ends (olive drab)
+	const bodyMat = new THREE.MeshStandardMaterial({
+		color: 0x3b3f2a,
+		roughness: 0.75,
+		metalness: 0.15,
+		emissive: 0x000000,
+		emissiveIntensity: 0
+	});
+	group.userData.bodyMat = bodyMat;
+
+	const bodyGeo = new THREE.CylinderGeometry(GRENADE_BODY_RADIUS, GRENADE_BODY_RADIUS, GRENADE_BODY_HEIGHT, 12, 1);
+	const body = new THREE.Mesh(bodyGeo, bodyMat);
+	group.add(body);
+
+	// Top cap sphere
+	const topCapGeo = new THREE.SphereGeometry(GRENADE_BODY_RADIUS, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2);
+	const topCap = new THREE.Mesh(topCapGeo, bodyMat);
+	topCap.position.y = GRENADE_BODY_HEIGHT / 2;
+	group.add(topCap);
+
+	// Bottom cap sphere
+	const botCapGeo = new THREE.SphereGeometry(GRENADE_BODY_RADIUS, 12, 6, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2);
+	const botCap = new THREE.Mesh(botCapGeo, bodyMat);
+	botCap.position.y = -GRENADE_BODY_HEIGHT / 2;
+	group.add(botCap);
+
+	// Segmented ridges around the body (horizontal lines)
+	const ridgeMat = new THREE.MeshStandardMaterial({ color: 0x2e3222, roughness: 0.85, metalness: 0.1 });
+	for (let i = 0; i < 5; i++) {
+		const ridgeGeo = new THREE.TorusGeometry(GRENADE_BODY_RADIUS + 0.002, 0.004, 4, 12);
+		const ridge = new THREE.Mesh(ridgeGeo, ridgeMat);
+		ridge.position.y = -GRENADE_BODY_HEIGHT / 2 + (GRENADE_BODY_HEIGHT / 4) * i;
+		ridge.rotation.x = Math.PI / 2;
+		group.add(ridge);
+	}
+
+	// Vertical ridges
+	for (let i = 0; i < 4; i++) {
+		const vRidgeGeo = new THREE.CylinderGeometry(0.004, 0.004, GRENADE_BODY_HEIGHT, 4);
+		const vRidge = new THREE.Mesh(vRidgeGeo, ridgeMat);
+		const angle = (Math.PI * 2 / 4) * i;
+		vRidge.position.x = Math.cos(angle) * (GRENADE_BODY_RADIUS + 0.002);
+		vRidge.position.z = Math.sin(angle) * (GRENADE_BODY_RADIUS + 0.002);
+		group.add(vRidge);
+	}
+
+	// Metal fuse assembly on top
+	const fuseMat = new THREE.MeshStandardMaterial({ color: 0x8a8a7a, roughness: 0.35, metalness: 0.7 });
+
+	// Fuse collar
+	const collarGeo = new THREE.CylinderGeometry(GRENADE_BODY_RADIUS * 0.65, GRENADE_BODY_RADIUS * 0.75, 0.02, 10);
+	const collar = new THREE.Mesh(collarGeo, fuseMat);
+	collar.position.y = GRENADE_BODY_HEIGHT / 2 + GRENADE_BODY_RADIUS * 0.5 + 0.01;
+	group.add(collar);
+
+	// Fuse top nub
+	const nubGeo = new THREE.CylinderGeometry(GRENADE_BODY_RADIUS * 0.3, GRENADE_BODY_RADIUS * 0.45, 0.025, 8);
+	const nub = new THREE.Mesh(nubGeo, fuseMat);
+	nub.position.y = collar.position.y + 0.02;
+	group.add(nub);
+
+	// Safety lever (spoon)
+	const leverMat = new THREE.MeshStandardMaterial({ color: 0x7a7a6a, roughness: 0.4, metalness: 0.6 });
+	const leverGeo = new THREE.BoxGeometry(0.012, 0.09, 0.025);
+	const lever = new THREE.Mesh(leverGeo, leverMat);
+	lever.position.set(GRENADE_BODY_RADIUS * 0.3, GRENADE_BODY_HEIGHT / 2 + 0.01, 0);
+	lever.rotation.z = -0.15;
+	group.add(lever);
+
+	// Pin ring
+	const pinMat = new THREE.MeshStandardMaterial({ color: 0x999988, roughness: 0.3, metalness: 0.8 });
+	const pinRingGeo = new THREE.TorusGeometry(0.015, 0.004, 6, 8);
+	const pinRing = new THREE.Mesh(pinRingGeo, pinMat);
+	pinRing.position.set(-GRENADE_BODY_RADIUS * 0.2, nub.position.y + 0.018, 0);
+	pinRing.rotation.x = Math.PI / 2;
+	group.add(pinRing);
+
+	group.castShadow = true;
+	group.traverse(c => { if (c.isMesh) { c.castShadow = true; c.frustumCulled = false; } });
+
+	return group;
+}
+
+function throwGrenade() {
+	if (GameState.paused) return;
+	if (grenadeCooldownTimer > 0) return;
+
+	grenadeCooldownTimer = GRENADE_COOLDOWN;
+	playGrenadePinSound();
+
+	const grenadeMesh = createGrenadeMesh();
+	scene.add(grenadeMesh);
+
+	camera.getWorldDirection(playerDirection);
+	const startPos = playerCollider.end.clone().addScaledVector(playerDirection, playerCollider.radius * 1.5);
+	grenadeMesh.position.copy(startPos);
+
+	const throwForce = 22;
+	const velocity = playerDirection.clone().multiplyScalar(throwForce);
+	velocity.y += 6;
+	velocity.addScaledVector(playerVelocity, 1.5);
+
+	const colliderRadius = GRENADE_BODY_RADIUS + 0.01;
+	const grenadeCollider = new THREE.Sphere(startPos.clone(), colliderRadius);
+
+	const grenade = {
+		mesh: grenadeMesh,
+		collider: grenadeCollider,
+		velocity: velocity,
+		fuseTimer: GRENADE_FUSE,
+		bounceCount: 0,
+		alive: true,
+		angularVel: new THREE.Vector3(
+			(Math.random() - 0.5) * 10,
+			(Math.random() - 0.5) * 5,
+			(Math.random() - 0.5) * 10
+		)
+	};
+
+	activeGrenades.push(grenade);
+}
+
+function updateGrenades(deltaTime) {
+	for (let i = activeGrenades.length - 1; i >= 0; i--) {
+		const g = activeGrenades[i];
+		if (!g.alive) continue;
+
+		g.fuseTimer -= deltaTime;
+
+		// Subtle glow as fuse runs out
+		if (g.fuseTimer < 1.5 && g.mesh.userData.bodyMat) {
+			const urgency = 1 - (g.fuseTimer / 1.5);
+			const pulseSpeed = 3 + urgency * 15;
+			const pulse = (Math.sin(performance.now() * 0.001 * pulseSpeed) + 1) * 0.5;
+			const glowAmount = urgency * pulse * 0.4;
+			g.mesh.userData.bodyMat.emissive.setRGB(glowAmount, glowAmount * 0.15, 0);
+			g.mesh.userData.bodyMat.emissiveIntensity = 1.0;
+		}
+
+		if (g.fuseTimer <= 0) {
+			explodeGrenade(g);
+			continue;
+		}
+
+		g.velocity.y -= GRAVITY * deltaTime;
+		g.collider.center.addScaledVector(g.velocity, deltaTime);
+
+		const result = worldOctree.sphereIntersect(g.collider);
+		if (result) {
+			const dot = g.velocity.dot(result.normal);
+			g.velocity.addScaledVector(result.normal, -dot * 1.6);
+			g.collider.center.add(result.normal.clone().multiplyScalar(result.depth));
+			g.velocity.multiplyScalar(0.45);
+			g.angularVel.multiplyScalar(0.7);
+
+			if (g.bounceCount < 4 && Math.abs(dot) > 1.5) {
+				playGrenadeBounceSound();
+			}
+			g.bounceCount++;
+		}
+
+		const damping = Math.exp(-0.8 * deltaTime) - 1;
+		g.velocity.addScaledVector(g.velocity, damping);
+
+		g.mesh.rotation.x += g.angularVel.x * deltaTime;
+		g.mesh.rotation.y += g.angularVel.y * deltaTime;
+		g.mesh.rotation.z += g.angularVel.z * deltaTime;
+
+		g.mesh.position.copy(g.collider.center);
+	}
+}
+
+function explodeGrenade(grenade) {
+	grenade.alive = false;
+	const pos = grenade.collider.center.clone();
+
+	scene.remove(grenade.mesh);
+	grenade.mesh.traverse(c => {
+		if (c.isMesh) {
+			if (c.geometry) c.geometry.dispose();
+			if (c.material) c.material.dispose();
+		}
+	});
+
+	const idx = activeGrenades.indexOf(grenade);
+	if (idx !== -1) activeGrenades.splice(idx, 1);
+
+	playExplosionSound();
+
+	const distToPlayer = pos.distanceTo(camera.position);
+	const shakeAmount = Math.max(0, 0.2 - distToPlayer * 0.006);
+	if (shakeAmount > 0) triggerScreenShake(shakeAmount, 0.82);
+
+	// Push balls
+	spheres.forEach(s => {
+		if (!s.alive) return;
+		const dist = s.collider.center.distanceTo(pos);
+		if (dist < GRENADE_RADIUS) {
+			const falloff = 1 - (dist / GRENADE_RADIUS);
+			const force = falloff * falloff * GRENADE_FORCE;
+			const dir = s.collider.center.clone().sub(pos).normalize();
+			s.velocity.addScaledVector(dir, force);
+			s.velocity.y += force * 0.4;
+
+			const origColor = s.mesh.material.color.getHex();
+			s.mesh.material.emissive.setHex(0xff4400);
+			s.mesh.material.emissiveIntensity = falloff;
+			setTimeout(() => {
+				s.mesh.material.emissive.setHex(origColor);
+				s.mesh.material.emissiveIntensity = 0.2;
+			}, 250);
+		}
+	});
+
+	// Push player
+	if (distToPlayer < GRENADE_RADIUS) {
+		const falloff = 1 - (distToPlayer / GRENADE_RADIUS);
+		const pushForce = falloff * falloff * GRENADE_FORCE * 0.5;
+		const pushDir = camera.position.clone().sub(pos).normalize();
+		playerVelocity.addScaledVector(pushDir, pushForce);
+		playerVelocity.y += pushForce * 0.35;
+	}
+
+	createExplosionEffect(pos);
+}
+
+function createExplosionEffect(position) {
+	// Flash light - warm orange
+	const flashLight = new THREE.PointLight(0xff5500, 20, 25, 2);
+	flashLight.position.copy(position);
+	scene.add(flashLight);
+
+	// Secondary white flash
+	const whiteFlash = new THREE.PointLight(0xffffff, 10, 15, 2);
+	whiteFlash.position.copy(position);
+	scene.add(whiteFlash);
+
+	const flashStart = performance.now();
+	function animateFlash() {
+		const elapsed = performance.now() - flashStart;
+		const t = elapsed / 400;
+		if (t >= 1) {
+			scene.remove(flashLight);
+			scene.remove(whiteFlash);
+			return;
+		}
+		flashLight.intensity = 20 * Math.pow(1 - t, 2);
+		whiteFlash.intensity = 10 * Math.pow(1 - t, 4);
+		requestAnimationFrame(animateFlash);
+	}
+	animateFlash();
+
+	// Inner fireball - white hot core
+	const coreGeo = new THREE.SphereGeometry(0.15, 10, 8);
+	const coreMat = new THREE.MeshBasicMaterial({ color: 0xffffcc, transparent: true, opacity: 1.0 });
+	const core = new THREE.Mesh(coreGeo, coreMat);
+	core.position.copy(position);
+	scene.add(core);
+
+	// Outer fireball - orange
+	const fireGeo = new THREE.SphereGeometry(0.3, 10, 8);
+	const fireMat = new THREE.MeshBasicMaterial({ color: 0xff6600, transparent: true, opacity: 0.8 });
+	const fireball = new THREE.Mesh(fireGeo, fireMat);
+	fireball.position.copy(position);
+	scene.add(fireball);
+
+	const fbStart = performance.now();
+	function animateFireball() {
+		const elapsed = performance.now() - fbStart;
+		const t = elapsed / 500;
+		if (t >= 1) {
+			scene.remove(core);
+			scene.remove(fireball);
+			coreMat.dispose(); coreGeo.dispose();
+			fireMat.dispose(); fireGeo.dispose();
+			return;
+		}
+		const coreScale = 1 + t * 5;
+		core.scale.setScalar(coreScale);
+		coreMat.opacity = Math.pow(1 - t, 3);
+		coreMat.color.setHex(t < 0.2 ? 0xffffff : t < 0.4 ? 0xffffaa : 0xffcc44);
+
+		const fireScale = 1 + t * 10;
+		fireball.scale.setScalar(fireScale);
+		fireMat.opacity = 0.8 * Math.pow(1 - t, 2);
+		fireMat.color.setHex(t < 0.15 ? 0xffaa44 : t < 0.4 ? 0xff5500 : t < 0.7 ? 0xaa2200 : 0x441100);
+
+		requestAnimationFrame(animateFireball);
+	}
+	animateFireball();
+
+	// Ground scorch mark
+	if (SETTINGS.graphics !== 'potato') {
+		const scorchGeo = new THREE.PlaneGeometry(2.5, 2.5);
+		const scorchCanvas = document.createElement('canvas');
+		scorchCanvas.width = 64; scorchCanvas.height = 64;
+		const sctx = scorchCanvas.getContext('2d');
+		const sg = sctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+		sg.addColorStop(0, 'rgba(15, 10, 5, 0.7)');
+		sg.addColorStop(0.4, 'rgba(25, 18, 10, 0.5)');
+		sg.addColorStop(0.7, 'rgba(35, 25, 15, 0.2)');
+		sg.addColorStop(1, 'rgba(40, 30, 20, 0)');
+		sctx.fillStyle = sg;
+		sctx.fillRect(0, 0, 64, 64);
+		const scorchTex = new THREE.CanvasTexture(scorchCanvas);
+		const scorchMat = new THREE.MeshBasicMaterial({
+			map: scorchTex, transparent: true, depthWrite: false,
+			polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4,
+			side: THREE.DoubleSide
+		});
+		const scorch = new THREE.Mesh(scorchGeo, scorchMat);
+		scorch.position.copy(position);
+		scorch.position.y = Math.max(0.02, position.y - 0.3);
+		scorch.rotation.x = -Math.PI / 2;
+		scorch.rotation.z = Math.random() * Math.PI * 2;
+		scene.add(scorch);
+
+		// Fade scorch over time
+		setTimeout(() => {
+			const scorchStart = performance.now();
+			function fadeScorch() {
+				const t = (performance.now() - scorchStart) / 8000;
+				if (t >= 1) {
+					scene.remove(scorch);
+					scorchMat.dispose(); scorchGeo.dispose(); scorchTex.dispose();
+					return;
+				}
+				scorchMat.opacity = 1 - t;
+				requestAnimationFrame(fadeScorch);
+			}
+			fadeScorch();
+		}, 5000);
+	}
+
+	// Dark smoke puffs (more realistic)
+	if (SETTINGS.graphics !== 'potato') {
+		const smokeTex = createSmokeTexture();
+		const smokeCount = SETTINGS.graphics === 'performance' ? 8 : 16;
+		for (let i = 0; i < smokeCount; i++) {
+			const isFireSmoke = i < smokeCount * 0.3;
+			const size = isFireSmoke ? (0.2 + Math.random() * 0.3) : (0.4 + Math.random() * 0.8);
+			const smokeColor = isFireSmoke ? 0x221100 : (i < smokeCount * 0.6 ? 0x222222 : 0x555544);
+			const mat = new THREE.SpriteMaterial({
+				map: smokeTex, transparent: true,
+				opacity: isFireSmoke ? 0.95 : 0.8,
+				depthWrite: false, color: smokeColor
+			});
+			const smoke = new THREE.Sprite(mat);
+			smoke.scale.set(size, size, 1);
+			smoke.position.copy(position);
+			smoke.position.y += Math.random() * 0.2;
+
+			const speed = isFireSmoke ? (3 + Math.random() * 5) : (1 + Math.random() * 3);
+			const vel = new THREE.Vector3(
+				(Math.random() - 0.5) * speed * 2,
+				1 + Math.random() * speed,
+				(Math.random() - 0.5) * speed * 2
+			);
+
+			scene.add(smoke);
+			const startTime = performance.now();
+			const duration = isFireSmoke ? (500 + Math.random() * 400) : (1200 + Math.random() * 1200);
+			const delay = isFireSmoke ? 0 : Math.random() * 200;
+			setTimeout(() => {
+				const realStart = performance.now();
+				function animSmoke() {
+					const elapsed = performance.now() - realStart;
+					const t = elapsed / duration;
+					if (t >= 1) {
+						scene.remove(smoke);
+						mat.dispose();
+						return;
+					}
+					smoke.position.addScaledVector(vel, 0.016);
+					vel.multiplyScalar(0.95);
+					vel.y -= 0.01;
+					const s = size * (1 + t * (isFireSmoke ? 3 : 5));
+					smoke.scale.set(s, s, 1);
+					mat.opacity = (isFireSmoke ? 0.95 : 0.8) * Math.pow(1 - t, 1.8);
+					if (isFireSmoke && t > 0.3) {
+						mat.color.setHex(0x333333);
+					}
+					requestAnimationFrame(animSmoke);
+				}
+				animSmoke();
+			}, delay);
+		}
+
+		// Shrapnel pieces
+		const shrapCount = SETTINGS.graphics === 'performance' ? 10 : 25;
+		for (let i = 0; i < shrapCount; i++) {
+			const isSpark = Math.random() > 0.5;
+			const shrapGeo = isSpark
+				? new THREE.SphereGeometry(0.01 + Math.random() * 0.015, 3, 3)
+				: new THREE.BoxGeometry(0.02 + Math.random() * 0.03, 0.01 + Math.random() * 0.015, 0.01 + Math.random() * 0.02);
+			const shrapColor = isSpark
+				? (Math.random() > 0.3 ? 0xff8800 : 0xffcc00)
+				: (Math.random() > 0.5 ? 0x333333 : 0x555544);
+			const shrapMat = new THREE.MeshBasicMaterial({
+				color: shrapColor, transparent: true, opacity: 1.0
+			});
+			const shrap = new THREE.Mesh(shrapGeo, shrapMat);
+			shrap.position.copy(position);
+			shrap.position.y += 0.1;
+
+			const shrapSpeed = 5 + Math.random() * 15;
+			const shrapVel = new THREE.Vector3(
+				(Math.random() - 0.5) * shrapSpeed * 2,
+				2 + Math.random() * shrapSpeed,
+				(Math.random() - 0.5) * shrapSpeed * 2
+			);
+			const rotVel = new THREE.Vector3(
+				(Math.random() - 0.5) * 20,
+				(Math.random() - 0.5) * 20,
+				(Math.random() - 0.5) * 20
+			);
+
+			scene.add(shrap);
+			const startTime = performance.now();
+			const duration = isSpark ? (200 + Math.random() * 300) : (400 + Math.random() * 600);
+			function animShrap() {
+				const elapsed = performance.now() - startTime;
+				const t = elapsed / duration;
+				if (t >= 1) {
+					scene.remove(shrap);
+					shrapMat.dispose();
+					shrapGeo.dispose();
+					return;
+				}
+				shrap.position.addScaledVector(shrapVel, 0.016);
+				shrapVel.y -= 0.25;
+				shrap.rotation.x += rotVel.x * 0.016;
+				shrap.rotation.y += rotVel.y * 0.016;
+				shrap.rotation.z += rotVel.z * 0.016;
+				shrapMat.opacity = isSpark ? Math.pow(1 - t, 0.5) : (1 - t);
+				if (isSpark && t > 0.5) shrapMat.color.setHex(0x882200);
+				requestAnimationFrame(animShrap);
+			}
+			animShrap();
+		}
+	}
+}
+// =========================================================
+
 // ==================== MOVEMENT STATE ====================
 let leftMouseDown = false;
 
@@ -1805,6 +2441,13 @@ document.addEventListener('keydown', e => {
 		e.preventDefault();
 		if (quickChatOpen) closeQuickChat();
 		else openQuickChat();
+		return;
+	}
+
+	// GRENADE - Press G to throw
+	if (e.code === 'KeyG' && GameState.started && !GameState.paused && document.pointerLockElement) {
+		e.preventDefault();
+		throwGrenade();
 		return;
 	}
 
@@ -2249,6 +2892,9 @@ function getSideVector() {
 function controls(deltaTime) {
 	if (slideCooldownTimer > 0) slideCooldownTimer -= deltaTime * STEPS_PER_FRAME;
 
+	// Update grenade cooldown
+	if (grenadeCooldownTimer > 0) grenadeCooldownTimer -= deltaTime * STEPS_PER_FRAME;
+
 	if (isSliding) {
 		slideTimer -= deltaTime * STEPS_PER_FRAME;
 		if (slideTimer <= 0 || !playerOnFloor) {
@@ -2403,6 +3049,7 @@ function animate() {
 			controls(deltaTime);
 			updatePlayer(deltaTime);
 			updateSpheres(deltaTime);
+			updateGrenades(deltaTime);
 			teleportPlayerIfOob();
 		}
 		if (GameState.autoFire && leftMouseDown && document.pointerLockElement) {
